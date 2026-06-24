@@ -13,7 +13,8 @@ Built on Kafka, Spark Structured Streaming, and Delta Lake — all running local
 - Storage on Delta Lake
 
 ## Architecture
-_(diagram coming soon)_
+<img width="1536" height="1024" alt="ChatGPT Image Jun 21, 2026, 11_50_23 PM" src="https://github.com/user-attachments/assets/912a9008-ab76-46ab-abee-4209160a2374" />
+
 
 ## Running locally
 _(coming soon)_
