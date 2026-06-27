@@ -36,5 +36,18 @@ services:
       - DYNAMIC_CONFIG_ENABLED=true
     depends_on:
       - kafka
+  spark:
+    image: apache/spark:3.5.3
+    container_name: fraud_spark
+    depends_on:
+      - kafka
+    volumes:
+      - ./app:/opt/app
+      - spark_checkpoints:/opt/checkpoints
+    working_dir: /opt/app
+    ports:
+      - "4040:4040"
+    command: ["sleep", "infinity"]    
 volumes:
   kafka_data:
+  spark_checkpoints:
