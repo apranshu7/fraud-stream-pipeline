@@ -17,4 +17,4 @@ Built on Kafka, Spark Structured Streaming, and Delta Lake — all running local
 
 
 ## Running locally
-_(coming soon)_
+- [Runbook](RUNBOOK.md) — step-by-step setup commands with reasoning
