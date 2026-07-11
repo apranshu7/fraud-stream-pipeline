@@ -1,0 +1,4 @@
+﻿kafka-python
+jupyterlab
+pyspark==3.5.3
+pandas

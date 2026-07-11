@@ -19,6 +19,7 @@ def make_transaction():
         "merchant": random.choice(["amazon", "walmart", "uber", "starbucks", "shell","flipkart"]),
         "event_time": datetime.now(timezone.utc).isoformat(),
     }
+
 if __name__ == "__main__":
     print("Producer starting at port kafka:9092, topic 'transactions'")
     try:

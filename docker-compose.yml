@@ -37,6 +37,7 @@ services:
     depends_on:
       - kafka
   spark:
+    user: root
     image: apache/spark:3.5.3
     container_name: fraud_spark
     depends_on:
@@ -45,10 +46,15 @@ services:
       - ./app:/opt/app
       - spark_checkpoints:/opt/checkpoints
       - ./delta:/opt/delta
+      - ./app/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    environment:
+      - SPARK_CONF_DIR=/opt/spark/conf
+      - PATH=/opt/spark/bin:/opt/spark/sbin:/usr/local/bin:/usr/bin:/bin
     working_dir: /opt/app
     ports:
       - "4040:4040"
-    command: ["sleep", "infinity"]    
+      - "8888:8888"
+    command: ["bash", "-c","pip install -r /opt/app/requirements.txt && jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token=''"]    
 volumes:
   kafka_data:
   spark_checkpoints:

@@ -1,6 +1,8 @@
 from pyspark.sql import SparkSession
+import json
 from pyspark.sql.functions import col, from_json, to_timestamp, window
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType
+from pyspark.sql.streaming import StreamingQueryListener
 
 spark = (SparkSession.builder
     .appName("window-transactions")
@@ -8,6 +10,22 @@ spark = (SparkSession.builder
     .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
     .getOrCreate())
 spark.sparkContext.setLogLevel("WARN")
+
+class MyListener(StreamingQueryListener):
+
+    def onQueryStarted(self, event):
+        print("Started")
+
+    def onQueryProgress(self, event):
+        data_progress = json.loads(event.progress.json)
+        et = data_progress.get("eventTime", {})
+        print("The watermark is : ", et.get("watermark"))
+        print("The max is : ", et.get("max"))
+        if data_progress["stateOperators"]:
+            print("Dropped: ", data_progress["stateOperators"][0]["numRowsDroppedByWatermark"])
+
+    def onQueryTerminated(self, event):
+        print("Stopped")
 
 schema = StructType([
     StructField("transaction_id", StringType(),  True),
@@ -37,17 +55,14 @@ parsed_df = (kafka_df
 
 windowed_df = (parsed_df.withWatermark("event_time","2 minutes").groupBy(window(col("event_time"),"1 minute"),col("user_id")).count())
 
-# query = (windowed_df.writeStream
-#     .format("delta")
-#     .outputMode("update")
-#     .option("checkpointLocation", "/opt/checkpoints/windowed_update")
-#     .option("path", "/opt/delta/transactions_windowed_update")
-#     .trigger(availableNow=True)
-#     .start())
+spark.streams.addListener(MyListener())
+
 query = (windowed_df.writeStream
-    .format("console")
-    .outputMode("update")
-    .option("truncate",False)
-    .trigger(availableNow=True)
+    .format("delta")
+    .outputMode("append")
+    .option("checkpointLocation", "/opt/checkpoints/running_final_checkpoint")
+    .option("path", "/opt/delta/transactions_running_final")
+    .trigger(processingTime = "30 seconds")
     .start())
+
 query.awaitTermination()

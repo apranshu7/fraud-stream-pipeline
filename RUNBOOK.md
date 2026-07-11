@@ -178,3 +178,41 @@ docker compose exec spark spark-submit --version
 # Install packages and submit the spark read job
 docker compose exec --user root spark /opt/spark/bin/spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.3,io.delta:delta-spark_2.12:3.3.2 /opt/app/spark_read.py
 ```
+## Windowing persistence - DONE (03-Jul)
+
+Windowed aggregation now persists to Delta. `spark_window.py`:
+`to_timestamp(event_time)` → `withWatermark("event_time","2 minutes")` →
+`groupBy(window(event_time,"1 minute"), user_id).count()` →
+`writeStream.format("delta").outputMode("append")
+.trigger(processingTime="30 seconds")`
+path `/opt/delta/transactions_running_prod`,
+checkpoint `/opt/checkpoints/running_prod_checkpoint`.
+
+**Why the earlier append run wrote 0 rows (and this one doesn't):**
+- `availableNow` drained the bounded backlog and exited → max event-time
+  froze → watermark (max − 2 min) froze → never passed any window's end →
+  no window finalized → append wrote nothing. Correct watermark behavior,
+  not a bug.
+- Fix: live producer + `processingTime` trigger. Live events keep pushing
+  max event-time forward → watermark advances → windows finalize and append.
+  `processingTime` keeps the query alive and re-checking; `availableNow` is
+  right for stateless raw/parse, wrong for the stateful windowing layer.
+- First rows land ≈ window length (1 min) + watermark lag (2 min) after the
+  producer starts, rounded up to the next trigger tick — NOT 2 min flat, and
+  NOT immediately. Do not Ctrl-C early thinking it's the zero-row bug again.
+
+**Verified:** 441 windowed rows in Delta. Schema flattened to
+`start_time, end_time, user_id, count` (window struct unpacked). Counts 1–3
+per (user, window) as expected.
+
+**Run:** producer in terminal 1
+(`docker compose exec --user root spark python3 /opt/app/producer.py`),
+spark-submit `spark_window.py` in terminal 2 with the kafka + delta packages
+and Delta SparkSession configs. Both run forever; Ctrl-C each to stop.
+`awaitTermination()` MUST be the last line or the async query dies on exit.
+
+**Known local-dev noise:** Parquet `MemoryManager ... scaling row group
+sizes` WARNs under small container heap. Self-correcting, not an error.
+
+⏭️ NEXT: LATE/DUP injection in producer → too-late drop demo; then
+exactly-once kill+restart proof. Persistence is done; these two are not.
